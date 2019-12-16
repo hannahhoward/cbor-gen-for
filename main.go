@@ -20,6 +20,7 @@ func main() {
 				Package:    os.Getenv("GOPACKAGE"),
 				GenStructs: c.Args().Slice(),
 			}.GenerateCborTypes()
+
 			return err
 		},
 	}

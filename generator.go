@@ -48,23 +48,38 @@ func (g Generator) GenerateCborTypes() error {
 		GenStructs: g.GenStructs,
 	}
 
-	t, err := template.New("run_cbor_gen").Parse(defaultTemplate)
+	rt, err := template.New("run_cbor_gen").Parse(runTemplate)
 	if err != nil {
 		return err
 	}
-
-	dir, err := ioutil.TempDir("", "gen")
+	mt, err := template.New("main").Parse(mainTemplate)
+	if err != nil {
+		return err
+	}
+	dir, err := ioutil.TempDir(".", "gen")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(dir) // clean up
 
 	f, err := os.OpenFile(filepath.Join(dir, "main.go"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	err = t.Execute(f, tdata)
+	err = mt.Execute(f, tdata)
 	if err != nil {
 		return err
 	}
 	f.Close()
+
+	tmp, err := ioutil.TempFile(".", "*.go")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+
+	err = rt.Execute(tmp, tdata)
+	if err != nil {
+		return err
+	}
+	tmp.Close()
 	cmd := exec.Command("go", "run", filepath.Join(dir, "main.go"))
 	output, err := cmd.Output()
 	fmt.Println(string(output))
@@ -72,29 +87,44 @@ func (g Generator) GenerateCborTypes() error {
 }
 
 var (
-	defaultTemplate = `
+	runTemplate = `
+	package {{.Package}}
+
+
+import (
+
+	cborgen "github.com/whyrusleeping/cbor-gen"
+)
+
+func RunCborGen() error {
+	genName := "{{.Path}}/{{.Filebase}}_cbor_gen.go"
+	if err := cborgen.WriteTupleEncodersToFile(
+		genName,
+		"{{.Package}}",
+		{{range .GenStructs}}
+			{{.}}{},
+		{{end}}
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+	`
+	mainTemplate = `
 package main
 
 import (
 	"fmt"
 	"os"
 
-	cborgen "github.com/whyrusleeping/cbor-gen"
 	{{.Package}} "{{.PkgPath}}"
 )
 
 func main() {
 	fmt.Print("Generating Cbor Marshal/Unmarshal...")
 
-	genName := "{{.Path}}/{{.Filebase}}_cbor_gen.go"
-	if err := cborgen.WriteTupleEncodersToFile(
-		genName,
-		"{{.Package}}",
-		{{$gen := .}}
-		{{range .GenStructs}}
-			{{$gen.Package}}.{{.}}{},
-		{{end}}
-	); err != nil {
+	if err := {{.Package}}.RunCborGen(); err != nil {
 		fmt.Println("Failed: ")
 		fmt.Println(err)
 		os.Exit(1)
