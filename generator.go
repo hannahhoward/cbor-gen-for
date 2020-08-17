@@ -16,18 +16,20 @@ import (
 var ErrWrongPackageCount = errors.New("Must be part of only one package")
 
 type Generator struct {
-	Path       string
-	Filename   string
-	Package    string
-	GenStructs []string
+	Path        string
+	Filename    string
+	Package     string
+	GenStructs  []string
+	MapEncoding bool
 }
 
 type templateData struct {
-	Path       string
-	Filebase   string
-	Package    string
-	GenStructs []string
-	PkgPath    string
+	Path        string
+	Filebase    string
+	Package     string
+	GenStructs  []string
+	PkgPath     string
+	MapEncoding bool
 }
 
 func (g Generator) GenerateCborTypes() error {
@@ -41,11 +43,12 @@ func (g Generator) GenerateCborTypes() error {
 		return ErrWrongPackageCount
 	}
 	tdata := templateData{
-		Path:       g.Path,
-		Package:    g.Package,
-		Filebase:   strings.TrimSuffix(g.Filename, ".go"),
-		PkgPath:    pkgs[0].PkgPath,
-		GenStructs: g.GenStructs,
+		Path:        g.Path,
+		Package:     g.Package,
+		Filebase:    strings.TrimSuffix(g.Filename, ".go"),
+		PkgPath:     pkgs[0].PkgPath,
+		GenStructs:  g.GenStructs,
+		MapEncoding: g.MapEncoding,
 	}
 
 	rt, err := template.New("run_cbor_gen").Parse(runTemplate)
@@ -98,7 +101,11 @@ import (
 
 func RunCborGen() error {
 	genName := "{{.Path}}/{{.Filebase}}_cbor_gen.go"
+	{{ if .MapEncoding }}
+	if err := cborgen.WriteMapEncodersToFile(
+	{{ else }}
 	if err := cborgen.WriteTupleEncodersToFile(
+	{{ end }}
 		genName,
 		"{{.Package}}",
 		{{range .GenStructs}}
