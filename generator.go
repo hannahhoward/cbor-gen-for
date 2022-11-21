@@ -34,7 +34,7 @@ type templateData struct {
 
 func (g Generator) GenerateCborTypes() error {
 	fpath := filepath.Join(g.Path, g.Filename)
-	pkgs, err := packages.Load(&packages.Config{Mode: packages.NeedName}, "file="+fpath)
+	pkgs, err := packages.Load(&packages.Config{}, "file="+fpath)
 	if err != nil {
 		return err
 	}
